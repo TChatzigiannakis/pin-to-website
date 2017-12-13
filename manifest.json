@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+
+  "name": "Pin to Website",
+  "description": "When a tab is pinned, it is \"locked\" to the website it is on. Navigating within that website is allowed normally. Attempting to navigate to another website will revert the tab to the last visited URL of the website it has \"locked\" on.",
+  "author": "Theodoros Chatzigiannakis",
+  "icons": {
+  },
+
+  "version": "0.1",
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage"
+  ]
+}
