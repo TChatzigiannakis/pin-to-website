@@ -15,50 +15,63 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* global chrome */
+
 var storage = chrome.storage.local;
 
-function saveTabState(tabId, tab, callback) {
+initialize();
+
+function initialize() {
+    saveCurrentStateOfAllPinnedTabs();
+    startMonitoringTabs();
+}
+
+function saveCurrentStateOfAllPinnedTabs() {
+    chrome.tabs.query({ }, tabs => {
+        for(var i = 0; i < tabs.length; i++) {
+            saveCurrentStateOfTab(tabs[i].id, tabs[i], () => { });
+        }
+    });        
+}
+
+function saveCurrentStateOfTab(tabId, tab, callback) {
     storage.set({ [tabId.toString()]: tab }, a => { callback(); });
 }
 
-function loadTabState(tabId, callback) {
+function getTabState(tabId, callback) {
     storage.get(tabId.toString(), result => { callback(result[tabId.toString()]); });
 }
 
-function revertToSavedTabState(tabId, callback) {
-    loadTabState(tabId, tab => {
+function restorePreviousStateOfTab(tabId, callback) {
+    getTabState(tabId, tab => {
         chrome.tabs.update(tabId, { "url": tab.url }, () => callback());
     });
 }
 
-function matchHostnameWithSaved(changedUrl, tabId, callback) {
-    loadTabState(tabId, result => {
+function isHostnameStillSameAsBefore(changedUrl, tabId, callback) {
+    getTabState(tabId, result => {
         var oldHostname = new URL(result.url).hostname;
         var newHostname = new URL(changedUrl).hostname;
         callback(oldHostname == newHostname);
     });
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {   
-    if (changeInfo.pinned) {                
-        saveTabState(tabId, tab, () => { });   
-    }
-
-    if (tab.pinned) {
-        if (changeInfo.url != undefined) {
-            matchHostnameWithSaved(changeInfo.url, tabId, match => {
-                if (match) {                    
-                    saveTabState(tabId, changeInfo, () => { });
-                } else {                
-                    revertToSavedTabState(tabId, () => { });
-                }        
-            });
-        }           
-    }       
-});
-
-chrome.tabs.query({ }, tabs => {
-    for(var i = 0; i < tabs.length; i++) {
-        saveTabState(tabs[i].id, tabs[i], () => { });
-    }
-});
+function startMonitoringTabs() {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {   
+        if (changeInfo.pinned) {                
+            saveCurrentStateOfTab(tabId, tab, () => { });   
+        }
+    
+        if (tab.pinned) {
+            if (changeInfo.url != undefined) {
+                isHostnameStillSameAsBefore(changeInfo.url, tabId, itIs => {
+                    if (itIs) {                    
+                        saveCurrentStateOfTab(tabId, tab, () => { });
+                    } else {                
+                        restorePreviousStateOfTab(tabId, () => { });
+                    }        
+                });
+            }           
+        }       
+    });    
+}
